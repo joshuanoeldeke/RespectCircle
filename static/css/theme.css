@@ -1,0 +1,74 @@
+/* Central theme variables and overrides */
+:root {
+  /* Primary branding colors */
+  --primary-color: #ce5c2a;
+  --secondary-color: rgb(88, 88, 88);
+  --accent-color: #ffc107;
+  /* Backgrounds */
+  --bg-light: #f8f9fa;
+  --bg-dark: #343a40;
+  /* Text colors */
+  --text-light: #ffffff;
+  --text-dark: #212529;
+  /* Font stack */
+  --font-base: 'Helvetica Neue', Arial, sans-serif;
+}
+
+body {
+  background-color: var(--bg-light);
+  color: var(--text-dark);
+  font-family: var(--font-base);
+}
+
+/* Navbar and links */
+.navbar {
+  background-color: var(--bg-light) !important;
+}
+.navbar-brand,
+.nav-link {
+  color: var(--primary-color) !important;
+}
+.nav-link:hover {
+  color: var(--secondary-color) !important;
+}
+
+/* Buttons */
+.btn-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+.btn-primary:hover {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+/* List items */
+.list-group-item {
+  border-color: var(--secondary-color);
+}
+
+/* Feed item card styling */
+.feed-item {
+  border: 1px solid var(--secondary-color);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background-color: #fff;
+}
+.feed-item-header {
+  font-weight: bold;
+  color: var(--primary-color);
+}
+.feed-item-time {
+  font-size: 0.875rem;
+  color: var(--secondary-color);
+}
+
+/* Goal item card styling */
+.goal-item {
+  border: 1px solid var(--secondary-color);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background-color: #fff;
+}
