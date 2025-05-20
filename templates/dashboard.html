@@ -22,12 +22,48 @@
       {% endfor %}
     </div>
     <div class="d-flex flex-column align-items-center mb-4 gap-2">
-      <div class="d-flex gap-2">
-        <button class="btn btn-success btn-lg log-btn" id="add-time-btn"><i class="fa fa-plus"></i> Add Time</button>
-        <button class="btn btn-outline-danger btn-lg log-btn" id="remove-time-btn"><i class="fa fa-minus"></i> Remove Time</button>
+      <div class="d-flex gap-2 mb-2" style="width: 100%; max-width: 600px;">
+        <button class="btn btn-success btn-lg flex-fill log-btn" id="add-time-btn"><i class="fa fa-plus"></i> Add Time</button>
+        <button class="btn btn-outline-danger btn-lg flex-fill log-btn" id="remove-time-btn"><i class="fa fa-minus"></i> Remove Time</button>
       </div>
-      <button class="btn btn-outline-warning reset-demo-btn mt-2">Reset Demo Data</button>
-      <a href="/set_played_demo" class="btn btn-link p-0 mt-2" style="font-size:0.95rem;">Set Rings (Demo)</a>
+      <div class="d-flex gap-2" style="width: 100%; max-width: 600px;">
+        <button class="btn btn-outline-warning btn-lg flex-fill reset-demo-btn" type="button">Reset Demo Data</button>
+        <a href="/set_played_demo" class="btn btn-outline-info btn-lg flex-fill" role="button">Set Rings (Demo)</a>
+        <button class="btn btn-outline-primary btn-lg flex-fill" id="edit-goals-btn" type="button">Edit Goals</button>
+      </div>
+    </div>
+
+    <!-- Edit Goals Modal -->
+    <div class="modal fade" id="editGoalsModal" tabindex="-1" aria-labelledby="editGoalsLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form id="edit-goals-form">
+            <div class="modal-header">
+              <h5 class="modal-title" id="editGoalsLabel">Edit Activity Goals</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label for="daily_goal" class="form-label">Daily Goal (min)</label>
+                <input type="number" class="form-control" id="daily_goal" name="daily_goal" min="1" required>
+              </div>
+              <div class="mb-3">
+                <label for="weekly_goal" class="form-label">Weekly Goal (min)<br><small class="text-muted">(must be ≥ daily)</small></label>
+                <input type="number" class="form-control" id="weekly_goal" name="weekly_goal" min="1" required>
+              </div>
+              <div class="mb-3">
+                <label for="monthly_goal" class="form-label">Monthly Goal (min)<br><small class="text-muted">(must be ≥ weekly)</small></label>
+                <input type="number" class="form-control" id="monthly_goal" name="monthly_goal" min="1" required>
+              </div>
+              <div id="goals-error" class="text-danger small"></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Goals</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
 </div>
 {% endblock %}
@@ -127,6 +163,44 @@ document.querySelector('.reset-demo-btn').addEventListener('click', function(){
   if(confirm('Reset all data to demo state?')) {
     fetch('/api/reset_demo', {method:'POST'}).then(()=>window.location.reload());
   }
+});
+document.getElementById('edit-goals-btn').addEventListener('click', function(){
+  // Pre-fill modal with current goals
+  document.getElementById('daily_goal').value = ringGoals.daily;
+  document.getElementById('weekly_goal').value = ringGoals.weekly;
+  document.getElementById('monthly_goal').value = ringGoals.monthly;
+  document.getElementById('goals-error').textContent = '';
+  new bootstrap.Modal(document.getElementById('editGoalsModal')).show();
+});
+
+document.getElementById('edit-goals-form').addEventListener('submit', function(e){
+  e.preventDefault();
+  const daily = parseInt(document.getElementById('daily_goal').value, 10);
+  const weekly = parseInt(document.getElementById('weekly_goal').value, 10);
+  const monthly = parseInt(document.getElementById('monthly_goal').value, 10);
+  if (!(daily > 0 && daily <= weekly && weekly <= monthly)) {
+    document.getElementById('goals-error').textContent = 'Must have monthly ≥ weekly ≥ daily > 0.';
+    return;
+  }
+  fetch('/api/set_goals', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({daily_goal: daily, weekly_goal: weekly, monthly_goal: monthly})
+  })
+  .then(res => res.json())
+  .then(function(data){
+    if(data.success) {
+      ringGoals.daily = data.daily_goal;
+      ringGoals.weekly = data.weekly_goal;
+      ringGoals.monthly = data.monthly_goal;
+      updateRing('daily', ringPlayed.daily, ringGoals.daily);
+      updateRing('weekly', ringPlayed.weekly, ringGoals.weekly);
+      updateRing('monthly', ringPlayed.monthly, ringGoals.monthly);
+      bootstrap.Modal.getInstance(document.getElementById('editGoalsModal')).hide();
+    } else {
+      document.getElementById('goals-error').textContent = data.error || 'Error saving goals.';
+    }
+  });
 });
 </script>
 {% endblock %}

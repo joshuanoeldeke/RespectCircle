@@ -169,3 +169,22 @@ def set_played_demo():
         except Exception as e:
             msg = f'Error: {e}'
     return render_template('set_played_demo.html', msg=msg)
+
+# --- API: Set Goals ---
+@app.route('/api/set_goals', methods=['POST'])
+def set_goals():
+    data = request.get_json() or {}
+    metrics = Metric.query.first()
+    try:
+        daily = int(data.get('daily_goal', metrics.daily_goal))
+        weekly = int(data.get('weekly_goal', metrics.weekly_goal))
+        monthly = int(data.get('monthly_goal', metrics.monthly_goal))
+    except Exception:
+        return jsonify({'success': False, 'error': 'All values must be integers.'}), 400
+    if not (0 < daily <= weekly <= monthly):
+        return jsonify({'success': False, 'error': 'Must have monthly ≥ weekly ≥ daily > 0.'}), 400
+    metrics.daily_goal = daily
+    metrics.weekly_goal = weekly
+    metrics.monthly_goal = monthly
+    db.session.commit()
+    return jsonify({'success': True, 'daily_goal': metrics.daily_goal, 'weekly_goal': metrics.weekly_goal, 'monthly_goal': metrics.monthly_goal})

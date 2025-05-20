@@ -67,7 +67,11 @@ input:focus, textarea:focus, select:focus {
 }
 
 /* Accessibility enhancements */
-:focus {
+button:focus,
+input:focus,
+select:focus,
+textarea:focus,
+a:focus {
   outline: 2px solid var(--primary-color) !important;
   background: #fffbe6;
 }
