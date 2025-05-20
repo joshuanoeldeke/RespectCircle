@@ -2,7 +2,7 @@
 :root {
   --primary-color: #ce5c2a;
   --accent-color: #ffc107;
-  --bg-gradient: linear-gradient(120deg, #e0f7fa, #e3f2fd);
+  --bg-gradient: linear-gradient(120deg, #ffe3c2, #ffd6b0);
   --text-dark: #212529;
   --font-base: 'Helvetica Neue', Arial, sans-serif;
 }
@@ -47,7 +47,7 @@ body {
   border: none;
   box-shadow: 0 8px 32px rgba(66,165,245,0.12), 0 1.5px 6px rgba(255,193,7,0.10);
   border-radius: 1.5rem;
-  background: linear-gradient(135deg, #fffbe6 60%, #e3f2fd 100%);
+  background: #fff !important;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 .card:hover {
@@ -59,7 +59,7 @@ body {
 .card-body canvas {
   display: block;
   margin: 0 auto;
-  filter: drop-shadow(0 0 8px #ffd60055);
+  filter: none;
 }
 input:focus, textarea:focus, select:focus {
   outline: 2px solid var(--accent-color);
