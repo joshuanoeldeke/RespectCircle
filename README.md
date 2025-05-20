@@ -1,60 +1,42 @@
 # RespectCircle
-# -------------
-# A web application to support and celebrate the progress of elderly users using a game-like rehab device. Family and friends can set goals, view progress, and post encouragements.
 
-## Overview
-RespectCircle is a Python Flask web app designed to motivate and support elderly users in their rehabilitation or daily activity routines. Inspired by Apple Watch's activity rings, it enables families and friends to set goals, track progress, and post encouragements in a social feed.
+RespectCircle is a simple, accessible web app for logging and visualizing activity progress using animated rings. Built with Flask and Bootstrap 5, it is designed for ease of use, accessibility, and future extensibility.
 
 ## Features
-- Accessible, simple UI (large buttons, clear fonts, high contrast)
-- Track metrics: minutes played, high score, daily/weekly/monthly progress
-- Visualize progress with rings/bars (Chart.js or similar)
-- Family/friends can post "Respect Moments" to a social feed
-- Add/update/display goals and progress
-- In-memory or SQLite storage (easy local prototyping)
-- Modular, well-documented Python code
+- **Accessible UI**: High-contrast, large touch targets, semantic HTML, ARIA labels, and keyboard navigation.
+- **Activity Rings Dashboard**: Visualize daily, weekly, and monthly progress. Log or reset time dynamically.
+- **Reset Demo Data**: Restore the app to its initial demo state with one click.
+- **Robust Input Validation**: Add/Remove Time only accepts positive integers.
+- **Minimal, single-page workflow**: No settings or goal editing UI for maximum reliability.
 
-## Setup & Usage
-1. **Clone the repository:**
-   ```sh
-   git clone https://github.com/yourusername/RespectCircle.git
-   cd RespectCircle
-   ```
-2. **Install dependencies:**
-   ```sh
+## Setup
+1. **Clone the repository**
+2. **Install dependencies**:
+   ```bash
    pip install -r requirements.txt
    ```
-3. **Initialize the database:**
-   ```sh
-   flask shell < instance/init_demo.sql
+3. **Run the app**:
+   ```bash
+   flask run
    ```
-   Or let the app auto-create tables on first run.
-4. **Run the app:**
-   ```sh
-   python app.py
-   ```
-   Visit [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
+   (To reset demo data, run the SQL in `instance/init_demo.sql` against `instance/respectcircle.db`.)
+4. **Visit** [http://localhost:5000](http://localhost:5000)
 
 ## Project Structure
-- `app.py` — Main Flask app and API endpoints
-- `instance/init_demo.sql` — Demo SQLite schema and mock data
-- `templates/` — Jinja2 HTML templates
-- `static/` — CSS and static assets
+- `app.py` — Main Flask app, models, API, and routes (single-user, single-page)
+- `templates/` — Jinja2 HTML templates: `dashboard.html`, `base.html`
+- `static/css/theme.css` — Custom theme (high-contrast, accessible)
+- `requirements.txt` — Only Flask and Flask-SQLAlchemy
 
-## Accessibility & Design
-- Large, high-contrast text and buttons
-- Responsive layout (Bootstrap)
-- Keyboard navigation and ARIA labels (WCAG-ready)
+## Accessibility
+- All forms and buttons have ARIA labels and visible focus states
+- Color choices meet WCAG AA contrast
+- Large, clear fonts and touch targets
 
-## Next Steps
-- Add authentication/user roles
-- Real-time notifications (WebSockets/SSE)
-- Internationalization (multi-language support)
-- Unit/integration tests (pytest)
-- Dockerize for deployment
-
-## Contributing
-Pull requests and suggestions are welcome! Please align with the mission: redefining societal respect for elders in Asia.
+## Extensibility
+- Modular codebase: ready for Flask blueprints, authentication, and new features
+- All scripts and styles are organized for easy extension
+- API endpoints are concise and well-logged
 
 ## License
 MIT

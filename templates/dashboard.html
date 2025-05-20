@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-4" id="main-content">
+    <h1 class="mb-4 text-center">Kinnecta Dashboard Demo</h1>
+    <!-- Activity Rings -->
+    <div class="row justify-content-center mb-5">
+      {% set ring_data = [
+        ('daily', 'Daily', metrics.daily_played, metrics.daily_goal, '#ff7043'),
+        ('weekly', 'Weekly', metrics.weekly_played, metrics.weekly_goal, '#42a5f5'),
+        ('monthly', 'Monthly', metrics.monthly_played, metrics.monthly_goal, '#ffd600')
+      ] %}
+      {% for key, label, played, goal, color in ring_data %}
+      <div class="col-12 col-md-4 mb-4 d-flex justify-content-center">
+        <div class="card text-center shadow-lg" style="width: 20rem; border-radius: 1.5rem; background: linear-gradient(135deg, #fffbe6 60%, #e3f2fd 100%);">
+          <div class="card-body">
+            <canvas id="{{ key }}Chart" width="200" height="200" aria-label="{{ label }} Progress" role="img"></canvas>
+            <h5 class="mt-3">{{ label }} Progress</h5>
+            <p class="mb-0"><span id="{{key}}-count">{{ played }}</span> / <span id="{{key}}-goal">{{ goal }}</span> min</p>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="d-flex flex-column align-items-center mb-4 gap-2">
+      <div class="d-flex gap-2">
+        <button class="btn btn-success btn-lg log-btn" id="add-time-btn"><i class="fa fa-plus"></i> Add Time</button>
+        <button class="btn btn-outline-danger btn-lg log-btn" id="remove-time-btn"><i class="fa fa-minus"></i> Remove Time</button>
+      </div>
+      <button class="btn btn-outline-warning reset-demo-btn mt-2">Reset Demo Data</button>
+      <a href="/set_played_demo" class="btn btn-link p-0 mt-2" style="font-size:0.95rem;">Set Rings (Demo)</a>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function renderRing(ctx, value, total, color) {
+  return new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      datasets: [{
+        data: [value, Math.max(total-value,0)],
+        backgroundColor: [color, '#e9ecef'],
+        borderWidth: 0,
+        hoverOffset: 8,
+        cutout: '75%'
+      }]
+    },
+    options: {
+      cutout: '75%',
+      plugins: { legend: { display: false } },
+      responsive: false,
+      maintainAspectRatio: false,
+      animation: { animateRotate: true, duration: 900 }
+    }
+  });
+}
+const ringTypes = ['daily','weekly','monthly'];
+const ringColors = {'daily':'#ff7043','weekly':'#42a5f5','monthly':'#ffd600'};
+const ringGoals = {
+  daily: Number('{{ metrics.daily_goal }}'),
+  weekly: Number('{{ metrics.weekly_goal }}'),
+  monthly: Number('{{ metrics.monthly_goal }}')
+};
+const ringPlayed = {
+  daily: Number('{{ metrics.daily_played }}'),
+  weekly: Number('{{ metrics.weekly_played }}'),
+  monthly: Number('{{ metrics.monthly_played }}')
+};
+const charts = {};
+ringTypes.forEach(function(type){
+  charts[type] = renderRing(
+    document.getElementById(type+'Chart').getContext('2d'),
+    ringPlayed[type], ringGoals[type], ringColors[type]
+  );
+});
+function updateRing(type, played, goal) {
+  charts[type].data.datasets[0].data[0] = played;
+  charts[type].data.datasets[0].data[1] = Math.max(goal-played,0);
+  charts[type].update();
+  document.getElementById(type+'-count').textContent = played;
+  document.getElementById(type+'-goal').textContent = goal;
+}
+function updateAllRings(data) {
+  updateRing('daily', data.daily_played, data.daily_goal);
+  updateRing('weekly', data.weekly_played, data.weekly_goal);
+  updateRing('monthly', data.monthly_played, data.monthly_goal);
+}
+function logTime(minutes) {
+  fetch('/api/log_time',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({minutes:minutes})
+  }).then(res=>res.json()).then(function(data){
+    if(data.success) updateAllRings(data);
+  });
+}
+function removeTime(minutes) {
+  fetch('/api/log_time',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({minutes:-Math.abs(minutes)})
+  }).then(res=>res.json()).then(function(data){
+    if(data.success) updateAllRings(data);
+  });
+}
+document.getElementById('add-time-btn').addEventListener('click', function(){
+  let minutes = prompt('How many minutes to add?');
+  if (!/^[0-9]+$/.test(minutes)) {
+    alert('Please enter a valid positive integer.');
+    return;
+  }
+  minutes = parseInt(minutes, 10);
+  if (!minutes || minutes <= 0) return;
+  logTime(minutes);
+});
+document.getElementById('remove-time-btn').addEventListener('click', function(){
+  let minutes = prompt('How many minutes to remove?');
+  if (!/^[0-9]+$/.test(minutes)) {
+    alert('Please enter a valid positive integer.');
+    return;
+  }
+  minutes = parseInt(minutes, 10);
+  if (!minutes || minutes <= 0) return;
+  removeTime(minutes);
+});
+document.querySelector('.reset-demo-btn').addEventListener('click', function(){
+  if(confirm('Reset all data to demo state?')) {
+    fetch('/api/reset_demo', {method:'POST'}).then(()=>window.location.reload());
+  }
+});
+</script>
+{% endblock %}

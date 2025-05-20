@@ -1,19 +1,10 @@
-/* Central theme variables and overrides */
+/* Minimal theme for RespectCircle MVP */
 :root {
-  /* Primary branding colors */
   --primary-color: #ce5c2a;
-  --secondary-color: rgb(88, 88, 88);
   --accent-color: #ffc107;
-  /* Backgrounds */
-  --bg-light: #f8f9fa;
-  --bg-dark: #343a40;
-  /* Text colors */
-  --text-light: #ffffff;
-  --text-dark: #212529;
-  /* Font stack */
-  --font-base: 'Helvetica Neue', Arial, sans-serif;
-  /* Background gradient */
   --bg-gradient: linear-gradient(120deg, #e0f7fa, #e3f2fd);
+  --text-dark: #212529;
+  --font-base: 'Helvetica Neue', Arial, sans-serif;
 }
 
 body {
@@ -22,72 +13,66 @@ body {
   font-family: var(--font-base);
 }
 
-/* Navbar and links */
-.navbar {
-  background-color: var(--bg-light) !important;
-}
-.navbar-brand,
-.nav-link {
-  color: var(--primary-color) !important;
-}
-.nav-link:hover {
-  color: var(--secondary-color) !important;
-}
-
 /* Buttons */
 .btn-primary {
   background-color: var(--primary-color);
   border-color: var(--primary-color);
 }
+.btn-primary:focus,
 .btn-primary:hover {
-  background-color: var(--accent-color);
-  border-color: var(--accent-color);
+  background-color: #b3471a; /* darker, accessible shade */
+  border-color: #b3471a;
+  color: #fff;
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
 }
-
-/* List items */
-.list-group-item {
-  border-color: var(--secondary-color);
+.btn-success {
+  background: linear-gradient(90deg, #43e97b 0%, #38f9d7 100%);
+  border: none;
+  color: #fff;
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(67,233,123,0.10);
+}
+.btn-success:hover, .btn-success:focus {
+  background: linear-gradient(90deg, #38f9d7 0%, #43e97b 100%);
+  color: #fff;
+}
+.btn:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
 }
 
 /* Card and tile styling */
-.card, .feed-item, .goal-item {
+.card {
   border: none;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 8px 32px rgba(66,165,245,0.12), 0 1.5px 6px rgba(255,193,7,0.10);
+  border-radius: 1.5rem;
+  background: linear-gradient(135deg, #fffbe6 60%, #e3f2fd 100%);
   transition: transform 0.2s, box-shadow 0.2s;
 }
-.card:hover, .feed-item:hover, .goal-item:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(0,0,0,0.15);
-}
-
-/* Feed item card styling */
-.feed-item {
-  border: 1px solid var(--secondary-color);
-  border-radius: 0.5rem;
-  padding: 1rem;
-  margin-bottom: 1rem;
-  background-color: #fff;
-}
-.feed-item-header {
-  font-weight: bold;
-  color: var(--primary-color);
-}
-.feed-item-time {
-  font-size: 0.875rem;
-  color: var(--secondary-color);
-}
-
-/* Goal item card styling */
-.goal-item {
-  border: 1px solid var(--secondary-color);
-  border-radius: 0.5rem;
-  padding: 1rem;
-  margin-bottom: 1rem;
-  background-color: #fff;
+.card:hover {
+  transform: translateY(-4px) scale(1.03);
+  box-shadow: 0 16px 32px rgba(66,165,245,0.18), 0 3px 12px rgba(255,193,7,0.15);
 }
 
 /* Center chart canvases */
 .card-body canvas {
   display: block;
   margin: 0 auto;
+  filter: drop-shadow(0 0 8px #ffd60055);
+}
+input:focus, textarea:focus, select:focus {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+/* Accessibility enhancements */
+:focus {
+  outline: 2px solid var(--primary-color) !important;
+  background: #fffbe6;
+}
+
+.reset-demo-btn {
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }

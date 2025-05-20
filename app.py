@@ -1,118 +1,105 @@
 """
-RespectCircle Flask App
-----------------------
-A web application to support and celebrate the progress of elderly users using a game-like rehab device. Family and friends can set goals, view progress, and post encouragements.
+RespectCircle Flask App (Single User, Single Page)
+--------------------------------------------------
+A web application to visualize and edit activity goals and progress using animated rings.
 """
 
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Flask, render_template, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+import logging
+import os, subprocess
 
+# --- App Setup ---
 app = Flask(__name__)
-app.secret_key = 'supersecretkey'  # Needed for flash messages
-
-# Database setup
+app.config['SECRET_KEY'] = 'supersecretkey'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///respectcircle.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 db = SQLAlchemy(app)
 
-# Models
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# --- Model ---
 class Metric(db.Model):
-    """Tracks play metrics and goals for the user."""
     id = db.Column(db.Integer, primary_key=True)
-    weekly_goal = db.Column(db.Integer, default=300)
-    daily_goal = db.Column(db.Integer, default=60)
-    monthly_goal = db.Column(db.Integer, default=1200)
-    weekly_played = db.Column(db.Integer, default=0)
-    daily_played = db.Column(db.Integer, default=0)
-    monthly_played = db.Column(db.Integer, default=0)
-    high_score = db.Column(db.Integer, default=0)
+    weekly_goal = db.Column(db.Integer, default=300, nullable=False)
+    daily_goal = db.Column(db.Integer, default=60, nullable=False)
+    monthly_goal = db.Column(db.Integer, default=1200, nullable=False)
+    weekly_played = db.Column(db.Integer, default=0, nullable=False)
+    daily_played = db.Column(db.Integer, default=0, nullable=False)
+    monthly_played = db.Column(db.Integer, default=0, nullable=False)
+    high_score = db.Column(db.Integer, default=0, nullable=False)
 
-class Goal(db.Model):
-    """Represents a user goal with progress tracking."""
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    target = db.Column(db.Integer, nullable=False)
-    progress = db.Column(db.Integer, default=0)
-
-class FeedEntry(db.Model):
-    """A short encouragement or achievement message for the feed."""
-    id = db.Column(db.Integer, primary_key=True)
-    by = db.Column(db.String(100), nullable=False)
-    text = db.Column(db.String(500), nullable=False)
-    time = db.Column(db.DateTime, default=datetime.utcnow)
-
-# Initialize database and ensure a single Metric row exists
+# --- DB Initialization ---
 def init_db():
-    """Initializes the database and ensures a Metric row exists."""
     with app.app_context():
         db.create_all()
         if not Metric.query.first():
             db.session.add(Metric())
             db.session.commit()
-
 init_db()
 
-# Routes
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    """Main dashboard: shows metrics, goals, and feed."""
-    if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        if username:
-            session['username'] = username
-            flash('Username updated!', 'success')
-        return redirect(url_for('index'))
+# --- Main Page ---
+@app.route('/', methods=['GET'])
+def dashboard():
     metrics = Metric.query.first()
-    goals = Goal.query.all()
-    feed = FeedEntry.query.order_by(FeedEntry.time.desc()).all()
-    return render_template('index.html', metrics=metrics, goals=goals, feed=feed)
+    return render_template('dashboard.html', metrics=metrics)
 
-# API Endpoints
-@app.route('/api/feed', methods=['POST'])
-def api_feed():
-    """API endpoint to post a new feed entry."""
+# --- API: Log Time ---
+@app.route('/api/log_time', methods=['POST'])
+def api_log_time():
     data = request.get_json() or {}
-    by = data.get('by', '').strip()
-    text = data.get('text', '').strip()
-    if not by or not text:
-        return jsonify({'error': 'Name and message required.'}), 400
-    entry = FeedEntry(by=by, text=text)
-    db.session.add(entry)
+    minutes = data.get('minutes')
+    if not isinstance(minutes, int):
+        return jsonify({'success': False, 'error': 'Minutes must be an integer.'}), 400
+    metrics = Metric.query.first()
+    # Allow both positive (add) and negative (remove) time, but don't allow negative totals
+    if minutes > 0:
+        metrics.daily_played += minutes
+        metrics.weekly_played += minutes
+        metrics.monthly_played += minutes
+    elif minutes < 0:
+        metrics.daily_played = max(0, metrics.daily_played + minutes)
+        metrics.weekly_played = max(0, metrics.weekly_played + minutes)
+        metrics.monthly_played = max(0, metrics.monthly_played + minutes)
+    else:
+        return jsonify({'success': False, 'error': 'Minutes must not be zero.'}), 400
+    # Enforce coherence: monthly >= weekly >= daily
+    metrics.weekly_played = max(metrics.weekly_played, metrics.daily_played)
+    metrics.monthly_played = max(metrics.monthly_played, metrics.weekly_played)
     db.session.commit()
-    return jsonify({'success': True, 'entry': {'by': entry.by, 'text': entry.text, 'time': entry.time.strftime('%Y-%m-%d %H:%M')}})
+    return jsonify({'success': True, 'daily_played': metrics.daily_played, 'weekly_played': metrics.weekly_played, 'monthly_played': metrics.monthly_played,
+                    'daily_goal': metrics.daily_goal, 'weekly_goal': metrics.weekly_goal, 'monthly_goal': metrics.monthly_goal})
 
-@app.route('/api/goals', methods=['POST'])
-def api_goals():
-    """API endpoint to add a new goal."""
+# --- API: Reset Metric ---
+@app.route('/api/reset_metric', methods=['POST'])
+def api_reset_metric():
     data = request.get_json() or {}
-    title = data.get('title', '').strip()
-    target = data.get('target')
-    if not title or not isinstance(target, int) or target <= 0:
-        return jsonify({'error': 'Valid title and target required.'}), 400
-    goal = Goal(title=title, target=target)
-    db.session.add(goal)
+    metric_type = data.get('type', 'daily')
+    metrics = Metric.query.first()
+    if metric_type == 'daily':
+        metrics.daily_played = 0
+    elif metric_type == 'weekly':
+        metrics.weekly_played = 0
+    elif metric_type == 'monthly':
+        metrics.monthly_played = 0
+    elif metric_type == 'all':
+        metrics.daily_played = 0
+        metrics.weekly_played = 0
+        metrics.monthly_played = 0
+    else:
+        return jsonify({'success': False, 'error': 'Invalid metric type.'}), 400
     db.session.commit()
-    return jsonify({'success': True, 'goal': {'id': goal.id, 'title': goal.title, 'target': goal.target, 'progress': goal.progress}})
+    return jsonify({'success': True})
 
-@app.route('/api/goals/update/<int:goal_id>', methods=['POST'])
-def api_update_goal(goal_id):
-    """API endpoint to update progress on a goal."""
-    data = request.get_json() or {}
-    increment = data.get('increment', 0)
-    if not isinstance(increment, int) or increment <= 0:
-        return jsonify({'error': 'Increment must be a positive integer.'}), 400
-    goal = Goal.query.get_or_404(goal_id)
-    goal.progress = min(goal.progress + increment, goal.target)
-    db.session.commit()
-    return jsonify({'success': True, 'progress': goal.progress})
-
+# --- API: Get Metrics (for reload) ---
 @app.route('/api/metrics')
 def api_metrics():
-    """API endpoint to get current metrics."""
     metrics = Metric.query.first()
     if not metrics:
-        return jsonify({'error': 'Metrics not found.'}), 404
+        return jsonify({'success': False, 'error': 'No metrics found.'}), 404
     return jsonify({
         'weekly_goal': metrics.weekly_goal,
         'daily_goal': metrics.daily_goal,
@@ -123,66 +110,62 @@ def api_metrics():
         'high_score': metrics.high_score
     })
 
-@app.route('/api/log_time', methods=['POST'])
-def api_log_time():
-    """API endpoint to log play time and update metrics. Adds a Respect Moment if a goal is achieved."""
-    data = request.get_json() or {}
-    minutes = data.get('minutes', 0)
-    if not isinstance(minutes, int) or minutes <= 0:
-        return jsonify({'error': 'Minutes must be a positive integer.'}), 400
-    metrics = Metric.query.first()
-    if not metrics:
-        return jsonify({'error': 'Metrics not found.'}), 404
-    # Track previous state for achievement detection
-    prev_daily = metrics.daily_played
-    prev_weekly = metrics.weekly_played
-    prev_monthly = metrics.monthly_played
-    metrics.daily_played += minutes
-    metrics.weekly_played += minutes
-    metrics.monthly_played += minutes
-    db.session.commit()
-    # Check for achievement and add Respect Moment
-    achieved = []
-    if prev_daily < metrics.daily_goal <= metrics.daily_played:
-        achieved.append('Daily')
-    if prev_weekly < metrics.weekly_goal <= metrics.weekly_played:
-        achieved.append('Weekly')
-    if prev_monthly < metrics.monthly_goal <= metrics.monthly_played:
-        achieved.append('Monthly')
-    if achieved:
-        username = session.get('username', 'Anonymous')
-        for goal_type in achieved:
-            text = f"{username} achieved their {goal_type.lower()} goal! 🎉"
-            entry = FeedEntry(by=username, text=text)
-            db.session.add(entry)
-        db.session.commit()
-    return jsonify({
-        'success': True,
-        'daily_played': metrics.daily_played,
-        'daily_goal': metrics.daily_goal,
-        'weekly_played': metrics.weekly_played,
-        'weekly_goal': metrics.weekly_goal,
-        'monthly_played': metrics.monthly_played,
-        'monthly_goal': metrics.monthly_goal
-    })
-
-@app.route('/api/reset_metric', methods=['POST'])
-def api_reset_metric():
-    """API endpoint to reset a metric (daily, weekly, or monthly) played value to 0."""
-    data = request.get_json() or {}
-    metric_type = data.get('type')
-    metrics = Metric.query.first()
-    if not metrics or metric_type not in ['daily', 'weekly', 'monthly']:
-        return jsonify({'error': 'Invalid metric type.'}), 400
-    if metric_type == 'daily':
-        metrics.daily_played = 0
-    elif metric_type == 'weekly':
-        metrics.weekly_played = 0
-    elif metric_type == 'monthly':
-        metrics.monthly_played = 0
-    db.session.commit()
+# --- API: Reset DB to Demo State ---
+@app.route('/api/reset_demo', methods=['POST'])
+def reset_demo():
+    db_path = os.path.join('instance', 'respectcircle.db')
+    sql_path = os.path.join('instance', 'init_demo.sql')
+    try:
+        if os.path.exists(db_path):
+            os.remove(db_path)
+        subprocess.run(f'sqlite3 {db_path} < {sql_path}', shell=True, check=True)
+        logger.info('Database reset to demo state.')
+        # Dispose SQLAlchemy session and engine to avoid stale connections
+        db.session.remove()
+        db.engine.dispose()
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
     return jsonify({'success': True})
 
-# Main entry point
-if __name__ == '__main__':
-    app.run(debug=True)
+@app.route('/api/set_played', methods=['POST'])
+def set_played():
+    data = request.get_json() or {}
+    metrics = Metric.query.first()
+    daily = data.get('daily_played', metrics.daily_played)
+    weekly = data.get('weekly_played', metrics.weekly_played)
+    monthly = data.get('monthly_played', metrics.monthly_played)
+    # Enforce coherence: monthly >= weekly >= daily
+    try:
+        daily = int(daily)
+        weekly = int(weekly)
+        monthly = int(monthly)
+    except Exception:
+        return jsonify({'success': False, 'error': 'All values must be integers.'}), 400
+    if not (0 <= daily <= weekly <= monthly):
+        return jsonify({'success': False, 'error': 'Must have monthly >= weekly >= daily >= 0.'}), 400
+    metrics.daily_played = daily
+    metrics.weekly_played = weekly
+    metrics.monthly_played = monthly
+    db.session.commit()
+    return jsonify({'success': True, 'daily_played': metrics.daily_played, 'weekly_played': metrics.weekly_played, 'monthly_played': metrics.monthly_played})
+
+@app.route('/set_played_demo', methods=['GET', 'POST'])
+def set_played_demo():
+    msg = None
+    if request.method == 'POST':
+        try:
+            daily = int(request.form.get('daily_played', 0))
+            weekly = int(request.form.get('weekly_played', 0))
+            monthly = int(request.form.get('monthly_played', 0))
+            if not (0 <= daily <= weekly <= monthly):
+                msg = 'Error: Must have monthly ≥ weekly ≥ daily ≥ 0.'
+            else:
+                metrics = Metric.query.first()
+                metrics.daily_played = daily
+                metrics.weekly_played = weekly
+                metrics.monthly_played = monthly
+                db.session.commit()
+                msg = 'Values updated!'
+        except Exception as e:
+            msg = f'Error: {e}'
+    return render_template('set_played_demo.html', msg=msg)
