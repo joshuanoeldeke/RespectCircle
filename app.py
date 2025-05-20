@@ -1,144 +1,188 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-from datetime import date
+"""
+RespectCircle Flask App
+----------------------
+A web application to support and celebrate the progress of elderly users using a game-like rehab device. Family and friends can set goals, view progress, and post encouragements.
+"""
+
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = 'supersecretkey'  # needed for flash messages
+app.secret_key = 'supersecretkey'  # Needed for flash messages
 
-# In-memory data
-metrics = {
-    "weekly_goal": 300,   # minutes per week
-    "daily_goal": 60,    # minutes per day
-    "weekly_played": 120, # sample data
-    "high_score": 8500    # sample score
-}
-goals = [
-    {"id": 1, "title": "10-min daily walk", "target": 70, "progress": 40},
-    {"id": 2, "title": "Tai Chi session",     "target": 30, "progress": 10},
-]
-feed = [
-    {"by": "Lisa", "text": "Dad scored 8500 points today!", "time": "2h ago"},
-    {"by": "Chen", "text": "Grandma completed her first week!", "time": "1d ago"},
-]
+# Database setup
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///respectcircle.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
-@app.route('/')
-def home():
-    return redirect(url_for('dashboard'))
+# Models
+class Metric(db.Model):
+    """Tracks play metrics and goals for the user."""
+    id = db.Column(db.Integer, primary_key=True)
+    weekly_goal = db.Column(db.Integer, default=300)
+    daily_goal = db.Column(db.Integer, default=60)
+    monthly_goal = db.Column(db.Integer, default=1200)
+    weekly_played = db.Column(db.Integer, default=0)
+    daily_played = db.Column(db.Integer, default=0)
+    monthly_played = db.Column(db.Integer, default=0)
+    high_score = db.Column(db.Integer, default=0)
 
-@app.route('/dashboard')
-def dashboard():
-    pct = int(metrics["weekly_played"] / metrics["weekly_goal"] * 100)
-    return render_template('dashboard.html',
-                           weekly_goal=metrics["weekly_goal"],
-                           weekly_played=metrics["weekly_played"],
-                           pct_played=pct,
-                           high_score=metrics["high_score"])
+class Goal(db.Model):
+    """Represents a user goal with progress tracking."""
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    target = db.Column(db.Integer, nullable=False)
+    progress = db.Column(db.Integer, default=0)
 
-@app.route('/goals', methods=['GET', 'POST'])
-def manage_goals():
-    errors = {}
-    form_data = {}
+class FeedEntry(db.Model):
+    """A short encouragement or achievement message for the feed."""
+    id = db.Column(db.Integer, primary_key=True)
+    by = db.Column(db.String(100), nullable=False)
+    text = db.Column(db.String(500), nullable=False)
+    time = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Initialize database and ensure a single Metric row exists
+def init_db():
+    """Initializes the database and ensures a Metric row exists."""
+    with app.app_context():
+        db.create_all()
+        if not Metric.query.first():
+            db.session.add(Metric())
+            db.session.commit()
+
+init_db()
+
+# Routes
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    """Main dashboard: shows metrics, goals, and feed."""
     if request.method == 'POST':
-        # collect and validate inputs
-        title = request.form.get('title','').strip()
-        target_raw = request.form.get('target','').strip()
-        form_data['title'] = title
-        form_data['target'] = target_raw
-        if not title:
-            errors['title'] = 'Please enter a goal title.'
-        try:
-            target = int(target_raw)
-            if target <= 0:
-                errors['target'] = 'Target minutes must be positive.'
-        except ValueError:
-            errors['target'] = 'Please enter a valid number.'
-        if errors:
-            flash('Please fix the errors below.', 'danger')
-            return render_template('goals.html', goals=goals, errors=errors, form_data=form_data)
-        # create goal
-        new_id = max(g["id"] for g in goals) + 1 if goals else 1
-        goals.append({"id": new_id, "title": title, "target": target, "progress": 0})
-        flash('Goal added successfully!', 'success')
-        return redirect(url_for('manage_goals'))
-    # GET
-    return render_template('goals.html', goals=goals, errors={}, form_data={})
+        username = request.form.get('username', '').strip()
+        if username:
+            session['username'] = username
+            flash('Username updated!', 'success')
+        return redirect(url_for('index'))
+    metrics = Metric.query.first()
+    goals = Goal.query.all()
+    feed = FeedEntry.query.order_by(FeedEntry.time.desc()).all()
+    return render_template('index.html', metrics=metrics, goals=goals, feed=feed)
 
-@app.route('/goals/update/<int:goal_id>', methods=['POST'])
-def update_goal(goal_id):
-    amt = int(request.form['progress'])
-    for g in goals:
-        if g["id"] == goal_id:
-            g["progress"] = min(g["target"], g["progress"] + amt)
-            break
-    flash('Progress updated!', 'success')
-    return redirect(url_for('manage_goals'))
-
-@app.route('/feed', methods=['GET', 'POST'])
-def show_feed():
-    errors = {}
-    form_data = {}
-    if request.method == 'POST':
-        # collect and validate inputs
-        by = request.form.get('by','').strip()
-        text = request.form.get('text','').strip()
-        form_data['by'] = by
-        form_data['text'] = text
-        if not by:
-            errors['by'] = 'Please enter your name.'
-        if not text:
-            errors['text'] = 'Please enter a moment.'
-        if errors:
-            flash('Please fix the errors below.', 'danger')
-            return render_template('feed.html', feed=feed, errors=errors, form_data=form_data)
-        # add to feed
-        feed.insert(0, {"by": by, "text": text, "time": "just now"})
-        flash('Respect moment posted!', 'success')
-        return redirect(url_for('show_feed'))
-    # GET
-    return render_template('feed.html', feed=feed, errors={}, form_data={})
-
+# API Endpoints
 @app.route('/api/feed', methods=['POST'])
 def api_feed():
+    """API endpoint to post a new feed entry."""
     data = request.get_json() or {}
-    by = data.get('by','').strip()
-    text = data.get('text','').strip()
+    by = data.get('by', '').strip()
+    text = data.get('text', '').strip()
     if not by or not text:
-        return jsonify({'error':'Name and moment are required.'}), 400
-    entry = {'by': by, 'text': text, 'time': 'just now'}
-    feed.insert(0, entry)
-    return jsonify(entry)
+        return jsonify({'error': 'Name and message required.'}), 400
+    entry = FeedEntry(by=by, text=text)
+    db.session.add(entry)
+    db.session.commit()
+    return jsonify({'success': True, 'entry': {'by': entry.by, 'text': entry.text, 'time': entry.time.strftime('%Y-%m-%d %H:%M')}})
 
 @app.route('/api/goals', methods=['POST'])
 def api_goals():
+    """API endpoint to add a new goal."""
     data = request.get_json() or {}
-    title = data.get('title','').strip()
+    title = data.get('title', '').strip()
     target = data.get('target')
     if not title or not isinstance(target, int) or target <= 0:
-        return jsonify({'error':'Title and positive target required.'}), 400
-    new_id = max((g['id'] for g in goals), default=0) + 1
-    goal = {'id': new_id, 'title': title, 'target': target, 'progress': 0}
-    goals.append(goal)
-    return jsonify(goal)
+        return jsonify({'error': 'Valid title and target required.'}), 400
+    goal = Goal(title=title, target=target)
+    db.session.add(goal)
+    db.session.commit()
+    return jsonify({'success': True, 'goal': {'id': goal.id, 'title': goal.title, 'target': goal.target, 'progress': goal.progress}})
 
 @app.route('/api/goals/update/<int:goal_id>', methods=['POST'])
 def api_update_goal(goal_id):
+    """API endpoint to update progress on a goal."""
     data = request.get_json() or {}
-    amt = data.get('progress')
-    try:
-        amt = int(amt)
-    except (TypeError, ValueError):
-        return jsonify({'error':'Invalid progress value.'}), 400
-    for g in goals:
-        if g['id'] == goal_id:
-            g['progress'] = min(g['target'], g['progress'] + amt)
-            return jsonify(g)
-    return jsonify({'error':'Goal not found.'}), 404
+    increment = data.get('increment', 0)
+    if not isinstance(increment, int) or increment <= 0:
+        return jsonify({'error': 'Increment must be a positive integer.'}), 400
+    goal = Goal.query.get_or_404(goal_id)
+    goal.progress = min(goal.progress + increment, goal.target)
+    db.session.commit()
+    return jsonify({'success': True, 'progress': goal.progress})
 
 @app.route('/api/metrics')
 def api_metrics():
-    pct = int(metrics['weekly_played'] / metrics['weekly_goal'] * 100)
-    data = metrics.copy()
-    data['pct_played'] = pct
-    return jsonify(data)
+    """API endpoint to get current metrics."""
+    metrics = Metric.query.first()
+    if not metrics:
+        return jsonify({'error': 'Metrics not found.'}), 404
+    return jsonify({
+        'weekly_goal': metrics.weekly_goal,
+        'daily_goal': metrics.daily_goal,
+        'monthly_goal': metrics.monthly_goal,
+        'weekly_played': metrics.weekly_played,
+        'daily_played': metrics.daily_played,
+        'monthly_played': metrics.monthly_played,
+        'high_score': metrics.high_score
+    })
 
+@app.route('/api/log_time', methods=['POST'])
+def api_log_time():
+    """API endpoint to log play time and update metrics. Adds a Respect Moment if a goal is achieved."""
+    data = request.get_json() or {}
+    minutes = data.get('minutes', 0)
+    if not isinstance(minutes, int) or minutes <= 0:
+        return jsonify({'error': 'Minutes must be a positive integer.'}), 400
+    metrics = Metric.query.first()
+    if not metrics:
+        return jsonify({'error': 'Metrics not found.'}), 404
+    # Track previous state for achievement detection
+    prev_daily = metrics.daily_played
+    prev_weekly = metrics.weekly_played
+    prev_monthly = metrics.monthly_played
+    metrics.daily_played += minutes
+    metrics.weekly_played += minutes
+    metrics.monthly_played += minutes
+    db.session.commit()
+    # Check for achievement and add Respect Moment
+    achieved = []
+    if prev_daily < metrics.daily_goal <= metrics.daily_played:
+        achieved.append('Daily')
+    if prev_weekly < metrics.weekly_goal <= metrics.weekly_played:
+        achieved.append('Weekly')
+    if prev_monthly < metrics.monthly_goal <= metrics.monthly_played:
+        achieved.append('Monthly')
+    if achieved:
+        username = session.get('username', 'Anonymous')
+        for goal_type in achieved:
+            text = f"{username} achieved their {goal_type.lower()} goal! 🎉"
+            entry = FeedEntry(by=username, text=text)
+            db.session.add(entry)
+        db.session.commit()
+    return jsonify({
+        'success': True,
+        'daily_played': metrics.daily_played,
+        'daily_goal': metrics.daily_goal,
+        'weekly_played': metrics.weekly_played,
+        'weekly_goal': metrics.weekly_goal,
+        'monthly_played': metrics.monthly_played,
+        'monthly_goal': metrics.monthly_goal
+    })
+
+@app.route('/api/reset_metric', methods=['POST'])
+def api_reset_metric():
+    """API endpoint to reset a metric (daily, weekly, or monthly) played value to 0."""
+    data = request.get_json() or {}
+    metric_type = data.get('type')
+    metrics = Metric.query.first()
+    if not metrics or metric_type not in ['daily', 'weekly', 'monthly']:
+        return jsonify({'error': 'Invalid metric type.'}), 400
+    if metric_type == 'daily':
+        metrics.daily_played = 0
+    elif metric_type == 'weekly':
+        metrics.weekly_played = 0
+    elif metric_type == 'monthly':
+        metrics.monthly_played = 0
+    db.session.commit()
+    return jsonify({'success': True})
+
+# Main entry point
 if __name__ == '__main__':
     app.run(debug=True)

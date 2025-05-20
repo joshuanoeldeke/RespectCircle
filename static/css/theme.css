@@ -12,10 +12,12 @@
   --text-dark: #212529;
   /* Font stack */
   --font-base: 'Helvetica Neue', Arial, sans-serif;
+  /* Background gradient */
+  --bg-gradient: linear-gradient(120deg, #e0f7fa, #e3f2fd);
 }
 
 body {
-  background-color: var(--bg-light);
+  background: var(--bg-gradient);
   color: var(--text-dark);
   font-family: var(--font-base);
 }
@@ -47,6 +49,17 @@ body {
   border-color: var(--secondary-color);
 }
 
+/* Card and tile styling */
+.card, .feed-item, .goal-item {
+  border: none;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.card:hover, .feed-item:hover, .goal-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+}
+
 /* Feed item card styling */
 .feed-item {
   border: 1px solid var(--secondary-color);
@@ -71,4 +84,10 @@ body {
   padding: 1rem;
   margin-bottom: 1rem;
   background-color: #fff;
+}
+
+/* Center chart canvases */
+.card-body canvas {
+  display: block;
+  margin: 0 auto;
 }

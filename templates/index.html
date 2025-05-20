@@ -5,67 +5,200 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Respect Circle</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
 <body>
 <div class="container my-4">
-    <h1 class="mb-4">Respect Circle Dashboard</h1>
+    <h1 class="mb-4 text-center">Respect Circle</h1>
 
-    <section class="mb-5">
-        <h2>Respect Moments</h2>
-        <ul class="list-group">
-            {% for m in moments %}
-            <li class="list-group-item">
-                <strong>{{ m.by }}</strong> (Elder ID: {{ m.elder_id }})<br>
-                {{ m.caption }}<br>
-                <a href="{{ m.media_url }}" target="_blank">View Media</a>
-            </li>
-            {% else %}
-            <li class="list-group-item">No moments yet.</li>
-            {% endfor %}
-        </ul>
-    </section>
+    <!-- Settings: Set User Name -->
+    <form id="user-form" class="mb-4 d-flex justify-content-center" method="post">
+      <div class="input-group w-50">
+        <input type="text" name="username" class="form-control" placeholder="Set your name for achievements" value="{{ session.get('username', '') }}" required>
+        <button class="btn btn-secondary">Set Name</button>
+      </div>
+    </form>
 
-    <section class="mb-5">
-        <h2>Challenges</h2>
-        <ul class="list-group">
-            {% for c in challenges %}
-            <li class="list-group-item">
-                <strong>{{ c.title }}</strong><br>
-                {{ c.description }}<br>
-                <em>{{ c.stamp }}</em>
-            </li>
-            {% else %}
-            <li class="list-group-item">No challenges yet.</li>
-            {% endfor %}
-        </ul>
-    </section>
+    <!-- Activity Rings Only -->
+    <div class="row justify-content-center mb-5">
+      {% set ring_data = [
+        ('daily', 'Daily', metrics.daily_played, metrics.daily_goal, '#198754'),
+        ('weekly', 'Weekly', metrics.weekly_played, metrics.weekly_goal, '#0d6efd'),
+        ('monthly', 'Monthly', metrics.monthly_played, metrics.monthly_goal, '#ffc107')
+      ] %}
+      {% for key, label, played, goal, color in ring_data %}
+      <div class="col-12 col-md-4 mb-4 d-flex justify-content-center">
+        <div class="card text-center shadow" style="width: 16rem;">
+          <div class="card-body">
+            <h5 class="card-title text-{{ 'success' if key == 'daily' else 'primary' if key == 'weekly' else 'warning' }}">{{ label }} Progress</h5>
+            <canvas id="{{ key }}Chart" width="180" height="180"></canvas>
+            <div class="mt-2 fw-bold" id="{{ key }}-count">{{ played }} / {{ goal }} min</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <!-- Unified action buttons below all rings -->
+    <div class="d-flex flex-column gap-2 align-items-center mb-4">
+      <button class="btn btn-success btn-lg log-btn" data-type="daily">Log Minutes</button>
+      <div>
+        <button class="btn btn-outline-secondary btn-sm quick-log-btn" data-type="daily" data-minutes="5">+5m</button>
+        <button class="btn btn-outline-secondary btn-sm quick-log-btn" data-type="daily" data-minutes="15">+15m</button>
+        <button class="btn btn-outline-danger btn-sm reset-btn ms-2" data-type="daily">Reset</button>
+      </div>
+    </div>
 
-    <section class="mb-5">
-        <h2>Community Events</h2>
-        <ul class="list-group">
-            {% for e in events %}
-            <li class="list-group-item">
-                <strong>{{ e.title }}</strong> at {{ e.location }} on {{ e.date }}
-            </li>
-            {% else %}
-            <li class="list-group-item">No upcoming events.</li>
-            {% endfor %}
-        </ul>
-    </section>
-
-    <section class="mb-5">
-        <h2>Family Legacy Vault</h2>
-        <ul class="list-group">
-            {% for v in vault %}
-            <li class="list-group-item">
-                <strong>Type:</strong> {{ v.type }} (Elder ID: {{ v.elder_id }})<br>
-                {{ v.content }}
-            </li>
-            {% else %}
-            <li class="list-group-item">No vault entries yet.</li>
-            {% endfor %}
-        </ul>
-    </section>
+    <!-- Feed Section: Achievements & Encouragements -->
+    <h4 class="text-primary mb-3 text-center"><i class="fa-solid fa-user-friends me-2"></i>Respect Moments</h4>
+    <form id="feed-form" method="post" class="mb-3 d-flex justify-content-center needs-validation" novalidate>
+      <div class="input-group w-50">
+        <input type="text" name="text" class="form-control" placeholder="Share a moment..." required>
+        <button class="btn btn-primary">Post</button>
+        <div class="invalid-feedback">Please enter a moment.</div>
+      </div>
+    </form>
+    <div id="feed-list" class="row justify-content-center">
+      <div class="col-12 col-md-8">
+        {% for m in feed %}
+        <div class="card feed-item mb-3 shadow-sm">
+          <div class="card-body">
+            <h6 class="card-title text-primary"><i class="fa-solid fa-user me-2"></i>{{ m.by }} <small class="text-muted"><i class="fa-regular fa-clock ms-2"></i> {{ m.time }}</small></h6>
+            <p class="card-text">{{ m.text }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
 </div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+<script>
+  // Render ring chart
+  function renderRing(ctx, value, total, color) {
+    return new Chart(ctx, {
+      type:'doughnut',
+      data:{
+        datasets:[{
+          data:[value, Math.max(total-value,0)],
+          backgroundColor:[color,'#e9ecef'],
+          borderWidth:0
+        }]
+      },
+      options:{
+        cutout:'75%',
+        responsive:false,
+        plugins:{
+          tooltip:{ enabled:false }
+        }
+      }
+    });
+  }
+
+  // Initialize charts
+  var dailyChart = renderRing(
+    document.getElementById('dailyChart').getContext('2d'),
+    Number('{{ metrics.daily_played }}'), Number('{{ metrics.daily_goal }}'),
+    '#198754'
+  );
+  var weeklyChart = renderRing(
+    document.getElementById('weeklyChart').getContext('2d'),
+    Number('{{ metrics.weekly_played }}'), Number('{{ metrics.weekly_goal }}'),
+    '#0d6efd'
+  );
+  var monthlyChart = renderRing(
+    document.getElementById('monthlyChart').getContext('2d'),
+    Number('{{ metrics.monthly_played }}'), Number('{{ metrics.monthly_goal }}'),
+    '#ffc107'
+  );
+  var charts = { daily: dailyChart, weekly: weeklyChart, monthly: monthlyChart };
+
+  // Confetti on goal completion
+  function maybeConfetti(type, played, goal) {
+    if (played >= goal) {
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.6 }
+      });
+    }
+  }
+
+  // Log time handler
+  function logTime(type, minutes) {
+    if (!minutes) {
+      var mins = prompt('How many minutes to log?');
+      if (!mins || isNaN(mins) || mins <= 0) return;
+      minutes = parseInt(mins);
+    }
+    fetch("{{ url_for('api_log_time') }}",{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({minutes:minutes})
+    }).then(res=>res.json()).then(function(data){
+      // Update all rings
+      charts.daily.data.datasets[0].data = [data.daily_played, Math.max(data.daily_goal-data.daily_played,0)];
+      charts.daily.update();
+      document.getElementById('daily-count').innerText = data.daily_played + ' / ' + data.daily_goal + ' min';
+      charts.weekly.data.datasets[0].data = [data.weekly_played, Math.max(data.weekly_goal-data.weekly_played,0)];
+      charts.weekly.update();
+      document.getElementById('weekly-count').innerText = data.weekly_played + ' / ' + data.weekly_goal + ' min';
+      charts.monthly.data.datasets[0].data = [data.monthly_played, Math.max(data.monthly_goal-data.monthly_played,0)];
+      charts.monthly.update();
+      document.getElementById('monthly-count').innerText = data.monthly_played + ' / ' + data.monthly_goal + ' min';
+      // Only show confetti if a goal was achieved
+      if ((data.daily_played === data.daily_goal) || (data.weekly_played === data.weekly_goal) || (data.monthly_played === data.monthly_goal)) {
+        confetti({
+          particleCount: 120,
+          spread: 80,
+          origin: { y: 0.6 }
+        });
+      }
+    });
+  }
+
+  // Attach log button events
+  document.querySelectorAll('.log-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      logTime(this.dataset.type);
+    });
+  });
+  document.querySelectorAll('.quick-log-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      logTime(this.dataset.type, parseInt(this.dataset.minutes));
+    });
+  });
+
+  // Attach reset button events
+  document.querySelectorAll('.reset-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      if(confirm('Reset ' + this.dataset.type + ' progress to 0?')) {
+        fetch("{{ url_for('api_reset_metric') }}",{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({type:this.dataset.type})
+        }).then(res=>res.json()).then(function(data){
+          if(data.success) {
+            charts[btn.dataset.type].data.datasets[0].data = [0, charts[btn.dataset.type].data.datasets[0].data[1] + charts[btn.dataset.type].data.datasets[0].data[0]];
+            charts[btn.dataset.type].update();
+            document.getElementById(btn.dataset.type + '-count').innerText = '0 / ' + charts[btn.dataset.type].data.datasets[0].data[1] + ' min';
+            // If daily is reset, also reset weekly and monthly
+            if(btn.dataset.type === 'daily') {
+              charts['weekly'].data.datasets[0].data[0] = 0;
+              charts['weekly'].update();
+              document.getElementById('weekly-count').innerText = '0 / ' + charts['weekly'].data.datasets[0].data[1] + ' min';
+              charts['monthly'].data.datasets[0].data[0] = 0;
+              charts['monthly'].update();
+              document.getElementById('monthly-count').innerText = '0 / ' + charts['monthly'].data.datasets[0].data[1] + ' min';
+            } else if(btn.dataset.type === 'weekly') {
+              charts['monthly'].data.datasets[0].data[0] = 0;
+              charts['monthly'].update();
+              document.getElementById('monthly-count').innerText = '0 / ' + charts['monthly'].data.datasets[0].data[1] + ' min';
+            }
+          }
+        });
+      }
+    });
+  });
+</script>
 </body>
 </html>
