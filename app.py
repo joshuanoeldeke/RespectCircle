@@ -114,7 +114,7 @@ def api_metrics():
 @app.route('/api/reset_demo', methods=['POST'])
 def reset_demo():
     db_path = os.path.join('instance', 'respectcircle.db')
-    sql_path = os.path.join('instance', 'init_demo.sql')
+    sql_path = 'init_demo.sql'
     try:
         if os.path.exists(db_path):
             os.remove(db_path)
