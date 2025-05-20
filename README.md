@@ -38,5 +38,69 @@ RespectCircle is a simple, accessible web app for logging and visualizing activi
 - All scripts and styles are organized for easy extension
 - API endpoints are concise and well-logged
 
+## Running in GitHub Codespaces & API Demo
+
+You can run RespectCircle in [GitHub Codespaces](https://github.com/features/codespaces) for easy cloud-based demos and development.
+
+### 1. Start the App in Codespaces
+
+Open a terminal in your Codespace and run:
+
+```bash
+# Install dependencies (if not already done)
+pip install -r requirements.txt
+
+# Start the Flask app on the correct host/port for Codespaces:
+python -m flask run --host=0.0.0.0 --port=5000
+```
+
+### 2. Make the Port Public
+
+- In the Codespaces UI, click the 'Ports' tab (bottom panel).
+- Find port `5000` in the list. Click the globe icon and set it to 'Public'.
+- Click the URL to open the app in your browser.
+
+### 3. Using the API Endpoints
+
+You can test the API directly with `curl`, Postman, or the built-in demo form (`Set Rings (Demo)` link on the dashboard).
+
+#### Example: Add 15 minutes
+```bash
+curl -X POST -H "Content-Type: application/json" \
+     -d '{"minutes": 15}' \
+     https://YOUR-CODESPACE-URL/api/log_time
+```
+
+#### Example: Remove 10 minutes
+```bash
+curl -X POST -H "Content-Type: application/json" \
+     -d '{"minutes": -10}' \
+     https://YOUR-CODESPACE-URL/api/log_time
+```
+
+#### Example: Set ring values directly
+```bash
+curl -X POST -H "Content-Type: application/json" \
+     -d '{"daily_played": 20, "weekly_played": 50, "monthly_played": 200}' \
+     https://YOUR-CODESPACE-URL/api/set_played
+```
+
+#### Example: Reset demo data
+```bash
+curl -X POST https://YOUR-CODESPACE-URL/api/reset_demo
+```
+
+- Replace `YOUR-CODESPACE-URL` with the public URL shown in the Ports tab (e.g., `https://5000-yourusername-respectcircle-xxxxxx.github.dev`).
+- You can also use Postman or the Set Rings (Demo) form for manual testing.
+
+### Troubleshooting
+- If you see a database error, run `./init_db.sh` to initialize/reset the database.
+- If the app is not reachable, make sure port 5000 is set to 'Public' in the Ports tab.
+- For persistent issues, try stopping and restarting the Codespace.
+
+---
+
+For more details, see the comments in `app.py` and the API documentation above.
+
 ## License
 MIT
