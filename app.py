@@ -4,9 +4,9 @@ RespectCircle Flask App (Single User, Single Page)
 A web application to visualize and edit activity goals and progress using animated rings.
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import os, subprocess
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
@@ -17,6 +17,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'supersecretkey'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///respectcircle.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # Set session timeout
 
 db = SQLAlchemy(app)
 
@@ -63,12 +64,13 @@ class Metric(db.Model):
 # --- DB Initialization ---
 init_done = False
 
+# Ensure `init_db` creates all tables and adds a default user
 @app.before_request
 def init_db():
     global init_done
     if not init_done:
         with app.app_context():
-            db.create_all()
+            db.create_all()  # Create all tables
             if not User.query.first():
                 user = User(username='default_user')
                 user.set_password('password')
@@ -77,6 +79,17 @@ def init_db():
                 db.session.add(Metric(user_id=user.id))
                 db.session.commit()
         init_done = True
+
+# Replace @app.before_first_request with @app.before_request for session clearing
+session_cleared = False
+
+@app.before_request
+def clear_session_on_startup():
+    global session_cleared
+    if not session_cleared:
+        session.clear()
+        logger.info("Session cache cleared on app startup.")
+        session_cleared = True
 
 # --- User Registration ---
 @app.route('/register', methods=['GET', 'POST'])
@@ -204,6 +217,10 @@ def reset_demo():
         # Dispose SQLAlchemy session and engine to avoid stale connections
         db.session.remove()
         db.engine.dispose()
+        # Clear session and reinitialize database schema
+        session.clear()
+        with app.app_context():
+            db.create_all()
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     return jsonify({'success': True})
