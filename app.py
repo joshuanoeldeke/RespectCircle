@@ -4,11 +4,13 @@ RespectCircle Flask App (Single User, Single Page)
 A web application to visualize and edit activity goals and progress using animated rings.
 """
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import logging
 import os, subprocess
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_bcrypt import Bcrypt
 
 # --- App Setup ---
 app = Flask(__name__)
@@ -18,12 +20,38 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# Initialize Flask-Login and Flask-Bcrypt
+login_manager = LoginManager(app)
+bcrypt = Bcrypt(app)
+
+# Configure the login view for Flask-Login
+login_manager.login_view = 'login'
+login_manager.login_message = 'Please log in to access this page.'
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# --- User Model ---
+class User(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(150), unique=True, nullable=False)
+    password_hash = db.Column(db.String(150), nullable=False)
+
+    def set_password(self, password):
+        self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+
+    def check_password(self, password):
+        return bcrypt.check_password_hash(self.password_hash, password)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
 # --- Model ---
 class Metric(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User', backref=db.backref('metrics', lazy=True))
     weekly_goal = db.Column(db.Integer, default=300, nullable=False)
     daily_goal = db.Column(db.Integer, default=60, nullable=False)
     monthly_goal = db.Column(db.Integer, default=1200, nullable=False)
@@ -33,18 +61,70 @@ class Metric(db.Model):
     high_score = db.Column(db.Integer, default=0, nullable=False)
 
 # --- DB Initialization ---
+init_done = False
+
+@app.before_request
 def init_db():
-    with app.app_context():
-        db.create_all()
-        if not Metric.query.first():
-            db.session.add(Metric())
-            db.session.commit()
-init_db()
+    global init_done
+    if not init_done:
+        with app.app_context():
+            db.create_all()
+            if not User.query.first():
+                user = User(username='default_user')
+                user.set_password('password')
+                db.session.add(user)
+                db.session.commit()
+                db.session.add(Metric(user_id=user.id))
+                db.session.commit()
+        init_done = True
+
+# --- User Registration ---
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        if User.query.filter_by(username=username).first():
+            flash('Username already exists.')
+            return redirect(url_for('register'))
+        user = User(username=username)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        flash('Registration successful. Please log in.')
+        return redirect(url_for('login'))
+    return render_template('register.html')
+
+# --- User Login ---
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        logger.info(f"Attempting login for username: {username}")
+        user = User.query.filter_by(username=username).first()
+        if user and user.check_password(password):
+            login_user(user)
+            logger.info(f"Login successful for username: {username}")
+            flash('Login successful.')
+            return redirect(url_for('dashboard'))
+        logger.warning(f"Login failed for username: {username}")
+        flash('Invalid username or password.')
+    return render_template('login.html')
+
+# --- User Logout ---
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('You have been logged out.')
+    return redirect(url_for('login'))
 
 # --- Main Page ---
 @app.route('/', methods=['GET'])
+@login_required
 def dashboard():
-    metrics = Metric.query.first()
+    metrics = Metric.query.filter_by(user_id=current_user.id).first()
     return render_template('dashboard.html', metrics=metrics)
 
 # --- API: Log Time ---
