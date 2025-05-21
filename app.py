@@ -113,8 +113,9 @@ def api_metrics():
 # --- API: Reset DB to Demo State ---
 @app.route('/api/reset_demo', methods=['POST'])
 def reset_demo():
-    db_path = os.path.join('instance', 'respectcircle.db')
-    sql_path = 'init_demo.sql'
+    project_root = os.path.dirname(os.path.abspath(__file__))  # Get the absolute path of the project root
+    db_path = os.path.join(project_root, 'instance', 'respectcircle.db')
+    sql_path = os.path.join(project_root, 'init_demo.sql')  # Use absolute path
     try:
         if os.path.exists(db_path):
             os.remove(db_path)
