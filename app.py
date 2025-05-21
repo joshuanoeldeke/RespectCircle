@@ -189,3 +189,7 @@ def set_goals():
     metrics.monthly_goal = monthly
     db.session.commit()
     return jsonify({'success': True, 'daily_goal': metrics.daily_goal, 'weekly_goal': metrics.weekly_goal, 'monthly_goal': metrics.monthly_goal})
+
+@app.route('/api_documentation')
+def api_documentation():
+    return render_template('api_documentation.html')

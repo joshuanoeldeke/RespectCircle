@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>API Documentation</h1>
+<p>This page provides details about the available API routes in the RespectCircle application.</p>
+
+<h2>API Routes</h2>
+
+<ul>
+  <li>
+    <h3>Log Time</h3>
+    <p><strong>Route:</strong> <code>/api/log_time</code></p>
+    <p><strong>Method:</strong> POST</p>
+    <p><strong>Description:</strong> Logs time played and updates daily, weekly, and monthly metrics.</p>
+    <p><strong>Request Body:</strong></p>
+    <pre>{"minutes": int}</pre>
+    <p><strong>Response:</strong></p>
+    <pre>{"success": bool, "daily_played": int, "weekly_played": int, "monthly_played": int, "daily_goal": int, "weekly_goal": int, "monthly_goal": int}</pre>
+  </li>
+
+  <li>
+    <h3>Reset Metric</h3>
+    <p><strong>Route:</strong> <code>/api/reset_metric</code></p>
+    <p><strong>Method:</strong> POST</p>
+    <p><strong>Description:</strong> Resets specific metrics (daily, weekly, monthly, or all) to zero.</p>
+    <p><strong>Request Body:</strong></p>
+    <pre>{"type": "daily" | "weekly" | "monthly" | "all"}</pre>
+    <p><strong>Response:</strong></p>
+    <pre>{"success": bool}</pre>
+  </li>
+
+  <li>
+    <h3>Get Metrics</h3>
+    <p><strong>Route:</strong> <code>/api/metrics</code></p>
+    <p><strong>Method:</strong> GET</p>
+    <p><strong>Description:</strong> Retrieves the current metrics (goals and played values).</p>
+    <p><strong>Response:</strong></p>
+    <pre>{"weekly_goal": int, "daily_goal": int, "monthly_goal": int, "weekly_played": int, "daily_played": int, "monthly_played": int, "high_score": int}</pre>
+  </li>
+
+  <li>
+    <h3>Reset Demo</h3>
+    <p><strong>Route:</strong> <code>/api/reset_demo</code></p>
+    <p><strong>Method:</strong> POST</p>
+    <p><strong>Description:</strong> Resets the database to the demo state using the <code>init_demo.sql</code> script.</p>
+    <p><strong>Response:</strong></p>
+    <pre>{"success": bool}</pre>
+  </li>
+
+  <li>
+    <h3>Set Played</h3>
+    <p><strong>Route:</strong> <code>/api/set_played</code></p>
+    <p><strong>Method:</strong> POST</p>
+    <p><strong>Description:</strong> Sets the <code>daily_played</code>, <code>weekly_played</code>, and <code>monthly_played</code> values, ensuring coherence (<code>monthly >= weekly >= daily</code>).</p>
+    <p><strong>Request Body:</strong></p>
+    <pre>{"daily_played": int, "weekly_played": int, "monthly_played": int}</pre>
+    <p><strong>Response:</strong></p>
+    <pre>{"success": bool, "daily_played": int, "weekly_played": int, "monthly_played": int}</pre>
+  </li>
+
+  <li>
+    <h3>Set Goals</h3>
+    <p><strong>Route:</strong> <code>/api/set_goals</code></p>
+    <p><strong>Method:</strong> POST</p>
+    <p><strong>Description:</strong> Updates the <code>daily_goal</code>, <code>weekly_goal</code>, and <code>monthly_goal</code> values, ensuring coherence (<code>monthly >= weekly >= daily > 0</code>).</p>
+    <p><strong>Request Body:</strong></p>
+    <pre>{"daily_goal": int, "weekly_goal": int, "monthly_goal": int}</pre>
+    <p><strong>Response:</strong></p>
+    <pre>{"success": bool, "daily_goal": int, "weekly_goal": int, "monthly_goal": int}</pre>
+  </li>
+</ul>
+
+{% endblock %}
